@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Neon Muse | Hyper-Luxe Digital Workspace</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,700;0,800;1,800&amp;family=Inter:wght@400;500;600&amp;family=Be+Vietnam+Pro:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    let notes = JSON.parse(localStorage.getItem('neon_muse_notes')) || [];
+    let editingId = null;
+    let activeCategory = 'Personal';
+    let currentFilter = 'All';
+
+    const titleInput = document.getElementById('note-title');
+    const contentInput = document.getElementById('note-content');
+    const addBtn = document.getElementById('add-note-btn');
+    const notesGrid = document.getElementById('notes-grid');
+    const searchInput = document.getElementById('search-input');
+
+    function saveNotes() {
+        localStorage.setItem('neon_muse_notes', JSON.stringify(notes));
+        renderNotes();
+    }
+
+    function selectCreationTag(el, category) {
+        activeCategory = category;
+        document.querySelectorAll('.category-pill').forEach(pill => {
+            pill.classList.remove('active');
+            pill.classList.add('opacity-40');
+            pill.style.boxShadow = 'none';
+        });
+        el.classList.remove('opacity-40');
+        el.classList.add('active');
+        const colors = { 'Personal': '#db90ff', 'Work': '#00fdc1', 'Ideas': '#ff67b1', 'Urgent': '#ff6e84' };
+        el.style.boxShadow = `0 0 15px ${colors[category]}66`;
+    }
+
+    addBtn.addEventListener('click', () => {
+        const title = titleInput.value.trim();
+        const content = contentInput.value.trim();
+        if (!title || !content) return;
+
+        if (editingId) {
+            const index = notes.findIndex(n => n.id === editingId);
+            notes[index] = { ...notes[index], title, content, category: activeCategory, timestamp: Date.now() };
+            editingId = null;
+            addBtn.innerHTML = '<span class="material-symbols-outlined group-hover:rotate-90 transition-transform duration-300">add_circle</span>Add Note';
+        } else {
+            notes.push({ id: Date.now(), title, content, category: activeCategory, timestamp: Date.now() });
+        }
+
+        titleInput.value = '';
+        contentInput.value = '';
+        saveNotes();
+    });
+
+    function renderNotes() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filtered = notes.filter(n => {
+            const matchesFilter = currentFilter === 'All' || n.category === currentFilter;
+            const matchesSearch = n.title.toLowerCase().includes(searchTerm) || n.content.toLowerCase().includes(searchTerm);
+            return matchesFilter && matchesSearch;
+        }).sort((a, b) => b.timestamp - a.timestamp);
+
+        let html = `
+            <div class="note-card group relative bg-surface-container-low border-2 border-dashed border-outline-variant/30 rounded-xl p-8 flex flex-col items-center justify-center min-h-[300px] hover:border-tertiary transition-all duration-500 cursor-pointer" onclick="document.getElementById('note-title').focus()">
+<span class="material-symbols-outlined text-5xl text-gray-700 group-hover:text-tertiary group-hover:rotate-12 transition-all duration-500 mb-4">add_notes</span>
+<p class="text-gray-600 font-label text-xs uppercase tracking-widest font-bold group-hover:text-tertiary transition-colors">Create something new</p>
+</div>
+        `;
+
+        filtered.forEach(note => {
+            const timeAgo = formatTime(note.timestamp);
+            const accentColor = note.category === 'Personal' ? 'primary' : (note.category === 'Work' ? 'tertiary' : (note.category === 'Ideas' ? 'secondary' : 'error'));
+            
+            html += `
+                <div class="note-card group relative bg-surface-container-high rounded-xl p-8 border border-outline-variant/10 hover:border-${accentColor}/30 transition-all duration-500 flex flex-col min-h-[300px] hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)] animate-in fade-in zoom-in duration-300">
+<div class="absolute inset-0 bg-${accentColor}/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<span class="bg-${accentColor}/20 text-${accentColor}-fixed-dim px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase font-label border border-${accentColor}/20">${note.category}</span>
+<span class="text-gray-500 font-label text-[10px] uppercase tracking-tighter">${timeAgo}</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4 group-hover:text-${accentColor} transition-colors relative z-10">${note.title}</h3>
+<p class="text-on-surface-variant font-body mb-8 line-clamp-4 relative z-10">${note.content}</p>
+<div class="mt-auto flex justify-between items-center relative z-10">
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-${accentColor} transition-colors" onclick="editNote(${note.id})">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-error transition-colors" onclick="deleteNote(${note.id}, this)">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+            `;
+        });
+
+        notesGrid.innerHTML = html;
+    }
+
+    function editNote(id) {
+        const note = notes.find(n => n.id === id);
+        titleInput.value = note.title;
+        contentInput.value = note.content;
+        editingId = id;
+        addBtn.innerHTML = '<span class="material-symbols-outlined">update</span>Update Note';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const pills = document.querySelectorAll('.category-pill');
+        pills.forEach(p => {
+            if (p.innerText.toUpperCase() === note.category.toUpperCase()) selectCreationTag(p, note.category);
+        });
+    }
+
+    function deleteNote(id, btn) {
+        const card = btn.closest('.note-card');
+        card.classList.add('opacity-0', 'scale-95');
+        setTimeout(() => {
+            notes = notes.filter(n => n.id !== id);
+            saveNotes();
+        }, 300);
+    }
+
+    function filterNotes(category, btn) {
+        currentFilter = category;
+        document.querySelectorAll('.filter-btn').forEach(b => {
+            b.classList.remove('bg-secondary', 'text-on-secondary', 'shadow-[0_5px_15px_rgba(255,103,177,0.2)]');
+            b.classList.add('bg-surface-container-highest', 'text-on-surface-variant');
+        });
+        btn.classList.add('bg-secondary', 'text-on-secondary', 'shadow-[0_5px_15px_rgba(255,103,177,0.2)]');
+        btn.classList.remove('bg-surface-container-highest', 'text-on-surface-variant');
+        renderNotes();
+    }
+
+    function formatTime(ts) {
+        const diff = Math.floor((Date.now() - ts) / 1000);
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        return new Date(ts).toLocaleDateString();
+    }
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        const icon = document.getElementById('theme-toggle-icon');
+        icon.innerText = isDark ? 'light_mode' : 'dark_mode';
+    }
+
+    searchInput.addEventListener('input', renderNotes);
+    
+    // Initial Render
+    renderNotes();
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0e0e0e;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-card {
+            background: rgba(38, 38, 38, 0.6);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+        .neon-glow:hover {
+            box-shadow: 0 0 15px rgba(219, 144, 255, 0.3);
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0e0e0e;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #484847;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #db90ff;
+        }
+        .category-pill.active {
+            box-shadow: 0 0 15px currentColor;
+            opacity: 1;
+        }
+        .category-pill {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .note-card {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .note-card.hidden {
+            display: none;
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen selection:bg-primary/30" x-data="noteApp()">
+<!-- TopNavBar -->
+<header class="bg-[#0e0e0e]/60 backdrop-blur-3xl font-['Plus_Jakarta_Sans'] text-sm tracking-wide docked full-width top-0 sticky z-50 border-b border-[#484847]/15 shadow-[0_0_20px_rgba(219,144,255,0.05)]">
+<div class="flex justify-between items-center max-w-[1400px] mx-auto px-8 h-20">
+<div class="text-2xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-[#db90ff] to-[#ff67b1]">
+            Neon Muse
+        </div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-[#db90ff] font-bold border-b-2 border-[#db90ff] pb-1" href="#">My Notes</a>
+<a class="text-gray-400 hover:text-white transition-colors" href="#">Archives</a>
+<a class="text-gray-400 hover:text-white transition-colors" href="#">Templates</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-[#db90ff]/10 hover:shadow-[0_0_15px_rgba(219,144,255,0.2)] transition-all duration-300 active:scale-95" onclick="toggleTheme()">
+<span class="material-symbols-outlined text-primary" id="theme-toggle-icon">light_mode</span>
+</button>
+<button class="bg-primary text-on-primary-container px-6 py-2.5 rounded-full font-bold hover:shadow-[0_0_15px_rgba(219,144,255,0.4)] transition-all duration-300 active:scale-95 flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">add</span>
+                New Note
+            </button>
+</div>
+</div>
+</header>
+<main class="max-w-[1400px] mx-auto px-6 py-12 md:py-20">
+<!-- Hero Section / Input Area -->
+<section class="flex flex-col items-center mb-24">
+<div class="w-full max-w-3xl glass-card p-8 md:p-12 rounded-xl shadow-2xl border border-outline-variant/10 relative overflow-hidden group">
+<div class="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl group-hover:bg-primary/30 transition-all duration-700"></div>
+<div class="absolute -bottom-24 -left-24 w-48 h-48 bg-secondary/10 rounded-full blur-3xl group-hover:bg-secondary/20 transition-all duration-700"></div>
+<h1 class="font-headline text-4xl md:text-5xl font-extrabold mb-8 tracking-tight text-center">
+                Capture the <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-tertiary">Vibe.</span>
+</h1>
+<div class="space-y-8 relative z-10">
+<div class="space-y-4">
+<input class="w-full bg-transparent border-b-2 border-surface-container-highest focus:border-primary text-xl md:text-2xl font-bold py-4 outline-none transition-all placeholder:text-gray-600 font-headline" id="note-title" placeholder="Note Title..." type="text"/>
+<textarea class="w-full bg-transparent border-none focus:ring-0 text-lg text-on-surface-variant min-h-[120px] resize-none font-body placeholder:text-gray-700" id="note-content" placeholder="Let your thoughts flow like liquid neon..."></textarea>
+</div>
+<!-- Category Selection Pills -->
+<div class="flex flex-wrap items-center gap-3 py-2">
+<span class="text-gray-500 font-label text-[10px] uppercase tracking-widest font-bold mr-2">Category:</span>
+<button class="category-pill active bg-primary/10 text-primary border border-primary/30 px-5 py-2 rounded-full text-xs font-bold tracking-wider hover:bg-primary/20 transition-all duration-300" onclick="selectCreationTag(this, 'Personal')">PERSONAL</button>
+<button class="category-pill opacity-40 bg-tertiary/10 text-tertiary border border-tertiary/30 px-5 py-2 rounded-full text-xs font-bold tracking-wider hover:bg-tertiary/20 transition-all duration-300" onclick="selectCreationTag(this, 'Work')">WORK</button>
+<button class="category-pill opacity-40 bg-secondary/10 text-secondary border border-secondary/30 px-5 py-2 rounded-full text-xs font-bold tracking-wider hover:bg-secondary/20 transition-all duration-300" onclick="selectCreationTag(this, 'Ideas')">IDEAS</button>
+<button class="category-pill opacity-40 bg-error/10 text-error border border-error/30 px-5 py-2 rounded-full text-xs font-bold tracking-wider hover:bg-error/20 transition-all duration-300" onclick="selectCreationTag(this, 'Urgent')">URGENT</button>
+</div>
+<div class="flex justify-end pt-4">
+<button class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-10 py-4 rounded-full font-bold text-lg hover:shadow-[0_10px_30px_rgba(219,144,255,0.3)] transition-all duration-500 active:scale-95 flex items-center gap-3 group" id="add-note-btn">
+<span class="material-symbols-outlined group-hover:rotate-90 transition-transform duration-300">add_circle</span>
+                        Add Note
+                    </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Search & Filter Area -->
+<section class="mb-16 flex flex-col md:flex-row md:items-center justify-between gap-6">
+<div class="relative flex-1 max-w-xl">
+<span class="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-primary text-2xl">search</span>
+<input class="w-full bg-surface-container-high border-none rounded-full py-5 pl-14 pr-6 text-on-surface focus:ring-2 focus:ring-primary/50 transition-all font-label tracking-wide shadow-inner" id="search-input" placeholder="Explore your digital archive..." type="text"/>
+</div>
+<div class="flex gap-3 overflow-x-auto pb-2 no-scrollbar" id="filter-container">
+<button class="filter-btn bg-secondary text-on-secondary px-8 py-3 rounded-full font-label text-xs uppercase tracking-widest font-bold whitespace-nowrap transition-all shadow-[0_5px_15px_rgba(255,103,177,0.2)]" onclick="filterNotes('All', this)">All Notes</button>
+<button class="filter-btn bg-surface-container-highest text-on-surface-variant hover:bg-surface-bright px-8 py-3 rounded-full font-label text-xs uppercase tracking-widest font-bold whitespace-nowrap transition-all" onclick="filterNotes('Personal', this)">Personal</button>
+<button class="filter-btn bg-surface-container-highest text-on-surface-variant hover:bg-surface-bright px-8 py-3 rounded-full font-label text-xs uppercase tracking-widest font-bold whitespace-nowrap transition-all" onclick="filterNotes('Work', this)">Work</button>
+<button class="filter-btn bg-surface-container-highest text-on-surface-variant hover:bg-surface-bright px-8 py-3 rounded-full font-label text-xs uppercase tracking-widest font-bold whitespace-nowrap transition-all" onclick="filterNotes('Ideas', this)">Ideas</button>
+</div>
+</section>
+<!-- Bento Grid / Note List -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8" id="notes-grid">
+<!-- Note Card 1 -->
+<div class="note-card group relative bg-surface-container-high rounded-xl p-8 border border-outline-variant/10 hover:border-primary/30 transition-all duration-500 flex flex-col min-h-[300px] hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]" data-category="Personal">
+<div class="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<span class="bg-primary/20 text-primary-fixed-dim px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase font-label border border-primary/20 shadow-[0_0_10px_rgba(219,144,255,0.1)]">Personal</span>
+<span class="text-gray-500 font-label text-[10px] uppercase tracking-tighter">2m ago</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4 group-hover:text-primary transition-colors relative z-10">Late Night Synth Vibes 🎹</h3>
+<p class="text-on-surface-variant font-body mb-8 line-clamp-4 relative z-10">Exploring the new wave of retro-futurism in UI design. Need to look into more grain textures and chromatic aberration effects for the landing page.</p>
+<div class="mt-auto flex justify-between items-center relative z-10">
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+<span class="material-symbols-outlined text-primary/40 group-hover:text-primary transition-colors">push_pin</span>
+</div>
+</div>
+<!-- Note Card 2 -->
+<div class="note-card group relative bg-surface-container-high rounded-xl p-8 border border-outline-variant/10 hover:border-secondary/30 transition-all duration-500 flex flex-col min-h-[300px] hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]" data-category="Ideas">
+<div class="absolute inset-0 bg-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<span class="bg-secondary/20 text-secondary-fixed-dim px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase font-label border border-secondary/20 shadow-[0_0_10px_rgba(255,103,177,0.1)]">Ideas</span>
+<span class="text-gray-500 font-label text-[10px] uppercase tracking-tighter">1h ago</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4 group-hover:text-secondary transition-colors relative z-10">Matcha Run Strategy 🍵</h3>
+<p class="text-on-surface-variant font-body mb-8 line-clamp-4 relative z-10">Check if that new cafe on 5th avenue has the oat milk lavender matcha. Maybe take the long route through the park for better lighting for the vlog.</p>
+<div class="mt-auto flex justify-between items-center relative z-10">
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-secondary transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Note Card 3 (Empty State Visual) -->
+<div class="note-card group relative bg-surface-container-low border-2 border-dashed border-outline-variant/30 rounded-xl p-8 flex flex-col items-center justify-center min-h-[300px] hover:border-tertiary transition-all duration-500" data-category="All">
+<span class="material-symbols-outlined text-5xl text-gray-700 group-hover:text-tertiary group-hover:rotate-12 transition-all duration-500 mb-4">add_notes</span>
+<p class="text-gray-600 font-label text-xs uppercase tracking-widest font-bold group-hover:text-tertiary transition-colors">Create something new</p>
+</div>
+<!-- Note Card 4 -->
+<div class="note-card group relative bg-surface-container-high rounded-xl p-8 border border-outline-variant/10 hover:border-tertiary/30 transition-all duration-500 flex flex-col min-h-[300px] hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]" data-category="Work">
+<div class="absolute inset-0 bg-tertiary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<span class="bg-tertiary/20 text-tertiary-fixed-dim px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase font-label border border-tertiary/20 shadow-[0_0_10px_rgba(0,253,193,0.1)]">Work</span>
+<span class="text-gray-500 font-label text-[10px] uppercase tracking-tighter">Yesterday</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4 group-hover:text-tertiary transition-colors relative z-10">Sprint Planning ⚡️</h3>
+<p class="text-on-surface-variant font-body mb-8 line-clamp-4 relative z-10">Finish the glassmorphism component library. Ensure the backdrop-blur values are consistent across mobile and desktop views.</p>
+<div class="mt-auto flex justify-between items-center relative z-10">
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-transparent full-width py-12 flex flex-col md:flex-row items-center justify-between px-8 border-t border-[#484847]/10">
+<div class="font-['Be_Vietnam_Pro'] text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-6 md:mb-0">
+        © 2024 Neon Muse Digital. Stay Vivid.
+    </div>
+<div class="flex gap-8">
+<a class="font-['Be_Vietnam_Pro'] text-[10px] uppercase tracking-[0.2em] text-gray-600 hover:text-[#aaffdc] transition-colors opacity-80 hover:opacity-100" href="#">Privacy</a>
+<a class="font-['Be_Vietnam_Pro'] text-[10px] uppercase tracking-[0.2em] text-gray-600 hover:text-[#aaffdc] transition-colors opacity-80 hover:opacity-100" href="#">Terms</a>
+<a class="font-['Be_Vietnam_Pro'] text-[10px] uppercase tracking-[0.2em] text-gray-600 hover:text-[#aaffdc] transition-colors opacity-80 hover:opacity-100" href="#">Support</a>
+</div>
+</footer>
+<!-- Image for Context (Visual Aesthetic Guide) -->
+<div class="fixed inset-0 -z-10 pointer-events-none opacity-20">
+<div class="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-[#0e0e0e] via-[#1a1919] to-[#0e0e0e]"></div>
+<div class="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px]"></div>
+<div class="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-secondary/10 rounded-full blur-[120px]"></div>
+</div>
+<script>
+    let notes = JSON.parse(localStorage.getItem('neon_muse_notes')) || [];
+    let editingId = null;
+    let activeCategory = 'Personal';
+    let currentFilter = 'All';
+
+    const titleInput = document.getElementById('note-title');
+    const contentInput = document.getElementById('note-content');
+    const addBtn = document.getElementById('add-note-btn');
+    const notesGrid = document.getElementById('notes-grid');
+    const searchInput = document.getElementById('search-input');
+
+    function saveNotes() {
+        localStorage.setItem('neon_muse_notes', JSON.stringify(notes));
+        renderNotes();
+    }
+
+    function selectCreationTag(el, category) {
+        activeCategory = category;
+        document.querySelectorAll('.category-pill').forEach(pill => {
+            pill.classList.remove('active');
+            pill.classList.add('opacity-40');
+            pill.style.boxShadow = 'none';
+        });
+        el.classList.remove('opacity-40');
+        el.classList.add('active');
+        const colors = { 'Personal': '#db90ff', 'Work': '#00fdc1', 'Ideas': '#ff67b1', 'Urgent': '#ff6e84' };
+        el.style.boxShadow = `0 0 15px ${colors[category]}66`;
+    }
+
+    addBtn.addEventListener('click', () => {
+        const title = titleInput.value.trim();
+        const content = contentInput.value.trim();
+        if (!title || !content) return;
+
+        if (editingId) {
+            const index = notes.findIndex(n => n.id === editingId);
+            notes[index] = { ...notes[index], title, content, category: activeCategory, timestamp: Date.now() };
+            editingId = null;
+            addBtn.innerHTML = '<span class="material-symbols-outlined group-hover:rotate-90 transition-transform duration-300">add_circle</span>Add Note';
+        } else {
+            notes.push({ id: Date.now(), title, content, category: activeCategory, timestamp: Date.now() });
+        }
+
+        titleInput.value = '';
+        contentInput.value = '';
+        saveNotes();
+    });
+
+    function renderNotes() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filtered = notes.filter(n => {
+            const matchesFilter = currentFilter === 'All' || n.category === currentFilter;
+            const matchesSearch = n.title.toLowerCase().includes(searchTerm) || n.content.toLowerCase().includes(searchTerm);
+            return matchesFilter && matchesSearch;
+        }).sort((a, b) => b.timestamp - a.timestamp);
+
+        let html = `
+            <div class="note-card group relative bg-surface-container-low border-2 border-dashed border-outline-variant/30 rounded-xl p-8 flex flex-col items-center justify-center min-h-[300px] hover:border-tertiary transition-all duration-500 cursor-pointer" onclick="document.getElementById('note-title').focus()">
+<span class="material-symbols-outlined text-5xl text-gray-700 group-hover:text-tertiary group-hover:rotate-12 transition-all duration-500 mb-4">add_notes</span>
+<p class="text-gray-600 font-label text-xs uppercase tracking-widest font-bold group-hover:text-tertiary transition-colors">Create something new</p>
+</div>
+        `;
+
+        filtered.forEach(note => {
+            const timeAgo = formatTime(note.timestamp);
+            const accentColor = note.category === 'Personal' ? 'primary' : (note.category === 'Work' ? 'tertiary' : (note.category === 'Ideas' ? 'secondary' : 'error'));
+            
+            html += `
+                <div class="note-card group relative bg-surface-container-high rounded-xl p-8 border border-outline-variant/10 hover:border-${accentColor}/30 transition-all duration-500 flex flex-col min-h-[300px] hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)] animate-in fade-in zoom-in duration-300">
+<div class="absolute inset-0 bg-${accentColor}/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<span class="bg-${accentColor}/20 text-${accentColor}-fixed-dim px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase font-label border border-${accentColor}/20">${note.category}</span>
+<span class="text-gray-500 font-label text-[10px] uppercase tracking-tighter">${timeAgo}</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4 group-hover:text-${accentColor} transition-colors relative z-10">${note.title}</h3>
+<p class="text-on-surface-variant font-body mb-8 line-clamp-4 relative z-10">${note.content}</p>
+<div class="mt-auto flex justify-between items-center relative z-10">
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-${accentColor} transition-colors" onclick="editNote(${note.id})">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-surface-bright flex items-center justify-center text-on-surface-variant hover:text-error transition-colors" onclick="deleteNote(${note.id}, this)">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+            `;
+        });
+
+        notesGrid.innerHTML = html;
+    }
+
+    function editNote(id) {
+        const note = notes.find(n => n.id === id);
+        titleInput.value = note.title;
+        contentInput.value = note.content;
+        editingId = id;
+        addBtn.innerHTML = '<span class="material-symbols-outlined">update</span>Update Note';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const pills = document.querySelectorAll('.category-pill');
+        pills.forEach(p => {
+            if (p.innerText.toUpperCase() === note.category.toUpperCase()) selectCreationTag(p, note.category);
+        });
+    }
+
+    function deleteNote(id, btn) {
+        const card = btn.closest('.note-card');
+        card.classList.add('opacity-0', 'scale-95');
+        setTimeout(() => {
+            notes = notes.filter(n => n.id !== id);
+            saveNotes();
+        }, 300);
+    }
+
+    function filterNotes(category, btn) {
+        currentFilter = category;
+        document.querySelectorAll('.filter-btn').forEach(b => {
+            b.classList.remove('bg-secondary', 'text-on-secondary', 'shadow-[0_5px_15px_rgba(255,103,177,0.2)]');
+            b.classList.add('bg-surface-container-highest', 'text-on-surface-variant');
+        });
+        btn.classList.add('bg-secondary', 'text-on-secondary', 'shadow-[0_5px_15px_rgba(255,103,177,0.2)]');
+        btn.classList.remove('bg-surface-container-highest', 'text-on-surface-variant');
+        renderNotes();
+    }
+
+    function formatTime(ts) {
+        const diff = Math.floor((Date.now() - ts) / 1000);
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        return new Date(ts).toLocaleDateString();
+    }
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        const icon = document.getElementById('theme-toggle-icon');
+        icon.innerText = isDark ? 'light_mode' : 'dark_mode';
+    }
+
+    searchInput.addEventListener('input', renderNotes);
+    
+    // Initial Render
+    renderNotes();
+    </script>
+</body></html>
